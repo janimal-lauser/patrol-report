@@ -1,18 +1,22 @@
 import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import MainTabNavigator from "@/navigation/MainTabNavigator";
-import ModalScreen from "@/screens/ModalScreen";
+import QuickLogModal from "@/screens/QuickLogModal";
+import ShiftSummaryModal from "@/screens/ShiftSummaryModal";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
+
+export type LogType = "fieldCheck" | "irregularity";
 
 export type RootStackParamList = {
   Main: undefined;
-  Modal: undefined;
+  QuickLog: { type: LogType };
+  ShiftSummary: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function RootStackNavigator() {
-  const screenOptions = useScreenOptions();
+  const screenOptions = useScreenOptions({ transparent: false });
 
   return (
     <Stack.Navigator screenOptions={screenOptions}>
@@ -22,11 +26,19 @@ export default function RootStackNavigator() {
         options={{ headerShown: false }}
       />
       <Stack.Screen
-        name="Modal"
-        component={ModalScreen}
+        name="QuickLog"
+        component={QuickLogModal}
         options={{
           presentation: "modal",
-          headerTitle: "Modal",
+          headerTitle: "Log Event",
+        }}
+      />
+      <Stack.Screen
+        name="ShiftSummary"
+        component={ShiftSummaryModal}
+        options={{
+          presentation: "modal",
+          headerTitle: "Shift Summary",
         }}
       />
     </Stack.Navigator>
