@@ -1,0 +1,42 @@
+
+App brief (English) – Patrol Tracking & Client Proof
+
+Goal
+Build a simple mobile app for a solo night patrol service. During each patrol shift, the app must record my location continuously (with my permission) and generate clear, client-ready proof of presence and checks.
+
+Core workflow
+	1.	Start Shift button
+	•	Requests/uses continuous location permission (foreground + background).
+	•	Starts tracking and stores a timestamped route.
+	2.	Mode toggle: “Driving” / “On foot”
+	•	I can tap Driving when in the vehicle and On foot when walking.
+	•	The route should be stored and displayed as two different track types (and exportable as such).
+	3.	Quick logs (one-tap + optional photo)
+	•	Field Check: Button that creates a log entry with time + GPS + optional photo (e.g., entrance photo).
+	•	Optional short text note (e.g., “Gate OK”, “Entrance checked”).
+	•	Irregularity / Incident: Button that creates a log entry with time + GPS + optional photo + mandatory short description.
+	4.	End Shift button
+	•	Stops tracking and compiles the shift report.
+
+Map & visualization requirements
+	•	Show the full route on a map with:
+	•	Time-segmented colors (example: first 30 min = green, second 30 min = yellow, third 30 min = red, etc.).
+	•	Direction arrows along the route (driving direction).
+	•	Clear markers for Field Check and Irregularity events.
+	•	The map should allow filtering: All / Driving only / On foot only.
+
+Output / reporting
+	•	After “End Shift”, the app must generate:
+	1.	A PDF report (client-ready) including:
+	•	Shift date, start/end time, total duration
+	•	Map with route and markers
+	•	List of logged events (Field Checks + Irregularities) with timestamps, notes, and embedded thumbnails/photos
+	2.	Optionally, upload the report and data to an online portal (secure access), or export a shareable file I can upload to my portal manually.
+
+Security & privacy
+	•	Data must be private, not public.
+	•	Access must be protected (login or secure link).
+	•	No live sharing required; post-shift upload/export is sufficient.
+
+Nice-to-have
+	•	Automatic detection suggestion (optional): if the phone speed is above a threshold, suggest “Driving”; otherwise suggest “On foot”. (Manual override must always be possible.)
