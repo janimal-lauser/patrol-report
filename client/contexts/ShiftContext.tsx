@@ -17,7 +17,7 @@ interface ShiftContextType {
   currentLocation: LocationPoint | null;
   locationPermission: boolean;
   startShift: () => Promise<void>;
-  endShift: () => Promise<void>;
+  endShift: () => Promise<Shift | undefined>;
   setMode: (mode: PatrolMode) => void;
   addEvent: (event: Omit<ShiftEvent, "id" | "timestamp" | "latitude" | "longitude">) => Promise<void>;
   requestLocationPermission: () => Promise<boolean>;

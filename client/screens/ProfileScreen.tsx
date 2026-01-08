@@ -25,14 +25,18 @@ type NavigationProp = NativeStackNavigationProp<ProfileStackParamList>;
 
 const SETTINGS_KEY = "@patrol_tracker_settings";
 
+type TrackingMode = "continuous" | "event-only";
+
 interface Settings {
   autoCenter: boolean;
   highAccuracy: boolean;
+  trackingMode: TrackingMode;
 }
 
 const defaultSettings: Settings = {
   autoCenter: true,
   highAccuracy: true,
+  trackingMode: "continuous",
 };
 
 export default function ProfileScreen() {
@@ -51,14 +55,19 @@ export default function ProfileScreen() {
     try {
       const data = await AsyncStorage.getItem(SETTINGS_KEY);
       if (data) {
-        setSettings(JSON.parse(data));
+        const savedSettings = JSON.parse(data);
+        const mergedSettings = { ...defaultSettings, ...savedSettings };
+        setSettings(mergedSettings);
+        if (!savedSettings.trackingMode) {
+          await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(mergedSettings));
+        }
       }
     } catch (error) {
       console.error("Error loading settings:", error);
     }
   };
 
-  const updateSetting = async (key: keyof Settings, value: boolean) => {
+  const updateSetting = async <K extends keyof Settings>(key: K, value: Settings[K]) => {
     const newSettings = { ...settings, [key]: value };
     setSettings(newSettings);
     await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(newSettings));
@@ -117,6 +126,74 @@ export default function ProfileScreen() {
           <ThemedText type="body" style={{ color: theme.neutral }}>
             Night Security
           </ThemedText>
+        </View>
+
+        <View style={styles.section}>
+          <ThemedText type="caption" style={styles.sectionTitle}>
+            GPS TRACKING MODE
+          </ThemedText>
+          <Card elevation={1} style={styles.settingsCard}>
+            <View style={styles.trackingModeContainer}>
+              <Pressable
+                style={[
+                  styles.trackingModeOption,
+                  { backgroundColor: settings.trackingMode === "continuous" ? theme.primary : theme.surface },
+                ]}
+                onPress={() => updateSetting("trackingMode", "continuous" as TrackingMode)}
+              >
+                <Feather
+                  name="radio"
+                  size={24}
+                  color={settings.trackingMode === "continuous" ? "#fff" : theme.text}
+                />
+                <ThemedText
+                  type="body"
+                  style={{ color: settings.trackingMode === "continuous" ? "#fff" : theme.text, fontWeight: "600" }}
+                >
+                  Continuous
+                </ThemedText>
+                <ThemedText
+                  type="caption"
+                  style={{ color: settings.trackingMode === "continuous" ? "rgba(255,255,255,0.8)" : theme.neutral, textAlign: "center" }}
+                >
+                  Full route tracking
+                </ThemedText>
+              </Pressable>
+              <Pressable
+                style={[
+                  styles.trackingModeOption,
+                  { backgroundColor: settings.trackingMode === "event-only" ? theme.primary : theme.surface },
+                ]}
+                onPress={() => updateSetting("trackingMode", "event-only" as TrackingMode)}
+              >
+                <Feather
+                  name="map-pin"
+                  size={24}
+                  color={settings.trackingMode === "event-only" ? "#fff" : theme.text}
+                />
+                <ThemedText
+                  type="body"
+                  style={{ color: settings.trackingMode === "event-only" ? "#fff" : theme.text, fontWeight: "600" }}
+                >
+                  Event-Only
+                </ThemedText>
+                <ThemedText
+                  type="caption"
+                  style={{ color: settings.trackingMode === "event-only" ? "rgba(255,255,255,0.8)" : theme.neutral, textAlign: "center" }}
+                >
+                  Privacy-compliant
+                </ThemedText>
+              </Pressable>
+            </View>
+            <View style={[styles.trackingModeInfo, { borderTopColor: theme.border }]}>
+              <Feather name="info" size={16} color={theme.neutral} />
+              <ThemedText type="caption" style={{ color: theme.neutral, flex: 1 }}>
+                {settings.trackingMode === "continuous"
+                  ? "Records your location every few seconds for full route visualization."
+                  : "Only records location when you log field checks or irregularities. German labor law compliant."}
+              </ThemedText>
+            </View>
+          </Card>
         </View>
 
         <View style={styles.section}>
@@ -266,5 +343,25 @@ const styles = StyleSheet.create({
   divider: {
     height: 1,
     marginLeft: Spacing.lg + 20 + Spacing.md,
+  },
+  trackingModeContainer: {
+    flexDirection: "row",
+    gap: Spacing.sm,
+    padding: Spacing.md,
+  },
+  trackingModeOption: {
+    flex: 1,
+    alignItems: "center",
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.lg,
+    gap: Spacing.xs,
+  },
+  trackingModeInfo: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: Spacing.sm,
+    padding: Spacing.md,
+    paddingTop: Spacing.md,
+    borderTopWidth: 1,
   },
 });
