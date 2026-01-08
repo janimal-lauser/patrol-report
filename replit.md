@@ -11,6 +11,10 @@ A mobile app for solo night patrol services. During each patrol shift, the app r
   - Field Check: Log entry with time, GPS, optional photo and note
   - Irregularity: Log entry with time, GPS, optional photo and mandatory description
 
+### GPS Tracking Modes
+- **Continuous**: Records location every few seconds for full route visualization
+- **Event-Only**: Only records location when logging events (German labor law compliant)
+
 ### Map Visualization
 - Full route displayed with time-segmented colors (30-min intervals)
 - Different line styles for driving (solid) vs walking (dashed)
@@ -23,13 +27,21 @@ A mobile app for solo night patrol services. During each patrol shift, the app r
 - Delete old shifts
 
 ### Profile
+- GPS Tracking Mode toggle (Continuous vs Event-Only)
 - Map settings (auto-center, high accuracy GPS)
 - Report settings (PDF quality, portal auto-upload)
 - Clear all data option
 
+### Subscription Tiers (via Stripe)
+- **Personal** (€9.99/mo): Full GPS tracking with continuous route recording
+- **Business** (€49/mo): Team management for up to 10 users
+- **Enterprise** (€199/mo): Privacy-compliant event-only tracking
+
 ## Tech Stack
 - **Frontend**: Expo / React Native
 - **Backend**: Express.js (TypeScript)
+- **Database**: PostgreSQL with Drizzle ORM
+- **Payments**: Stripe (subscriptions, products, checkout)
 - **Storage**: AsyncStorage (local persistence)
 - **Maps**: react-native-maps
 - **Location**: expo-location
@@ -48,10 +60,21 @@ client/
 ├── screens/                # App screens
 └── types/shift.ts          # TypeScript types
 server/
-├── index.ts               # Express server
-├── routes.ts              # API routes
+├── index.ts               # Express server with Stripe init
+├── routes.ts              # API routes (products, checkout, subscriptions)
+├── storage.ts             # Database queries for Stripe data
+├── stripeClient.ts        # Stripe client configuration
+├── seed-products.ts       # Script to create subscription products
 └── templates/             # Landing page
+shared/
+└── schema.ts              # Drizzle database schema
 ```
+
+## API Endpoints
+- `GET /api/products` - List subscription products with prices
+- `POST /api/checkout` - Create Stripe checkout session
+- `POST /api/portal` - Create Stripe customer portal session
+- `GET /api/subscription/:userId` - Get user subscription info
 
 ## Navigation Structure
 - **Active Shift Tab**: Main map screen with tracking controls
@@ -63,13 +86,17 @@ server/
 - **Shift Summary**: Review completed shift before saving
 
 ## Recent Changes
+- Added GPS Tracking Mode toggle (Continuous vs Event-Only) in Profile
+- Integrated Stripe for subscription billing
+- Created subscription products (Personal, Business, Enterprise)
+- Added PostgreSQL database with Drizzle ORM for user/subscription data
 - Initial MVP implementation with location tracking, event logging, and shift history
 - Map visualization with time-segmented route colors
 - Camera integration for photo attachments
-- AsyncStorage for local data persistence
 
 ## Next Phase Features
 - PDF report generation
 - Portal upload functionality
 - Background location tracking
 - Speed-based auto mode detection
+- Connect tracking mode to ShiftContext for actual behavior change
