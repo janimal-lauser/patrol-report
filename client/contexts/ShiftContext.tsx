@@ -10,6 +10,8 @@ import {
   generateId,
   getUserName,
   saveUserName,
+  getTrackingMode,
+  TrackingMode,
 } from "@/lib/storage";
 
 interface ShiftContextType {
@@ -36,12 +38,14 @@ export function ShiftProvider({ children }: { children: React.ReactNode }) {
   const [currentLocation, setCurrentLocation] = useState<LocationPoint | null>(null);
   const [locationPermission, setLocationPermission] = useState(false);
   const [userName, setUserNameState] = useState<string | null>(null);
+  const [trackingMode, setTrackingMode] = useState<TrackingMode>("continuous");
   const locationSubscription = useRef<Location.LocationSubscription | null>(null);
 
   useEffect(() => {
     loadActiveShift();
     checkLocationPermission();
     loadUserName();
+    loadTrackingMode();
 
     return () => {
       if (locationSubscription.current) {
@@ -49,6 +53,11 @@ export function ShiftProvider({ children }: { children: React.ReactNode }) {
       }
     };
   }, []);
+
+  const loadTrackingMode = async () => {
+    const mode = await getTrackingMode();
+    setTrackingMode(mode);
+  };
 
   const loadUserName = async () => {
     const name = await getUserName();
@@ -67,8 +76,11 @@ export function ShiftProvider({ children }: { children: React.ReactNode }) {
       setIsTracking(true);
       if (shift.route.length > 0) {
         setCurrentMode(shift.route[shift.route.length - 1].mode);
+        setCurrentLocation(shift.route[shift.route.length - 1]);
       }
-      startLocationTracking();
+      if (shift.trackingMode === "continuous" || !shift.trackingMode) {
+        startLocationTracking();
+      }
     }
   };
 
@@ -125,6 +137,9 @@ export function ShiftProvider({ children }: { children: React.ReactNode }) {
     if (!hasPermission) return;
 
     await handleSetUserName(name);
+    
+    const currentTrackingMode = await getTrackingMode();
+    setTrackingMode(currentTrackingMode);
 
     const location = await Location.getCurrentPositionAsync({
       accuracy: Location.Accuracy.High,
@@ -145,13 +160,17 @@ export function ShiftProvider({ children }: { children: React.ReactNode }) {
       route: [initialPoint],
       events: [],
       isActive: true,
+      trackingMode: currentTrackingMode,
     };
 
     setActiveShift(newShift);
     setCurrentLocation(initialPoint);
     setIsTracking(true);
     await saveActiveShift(newShift);
-    await startLocationTracking();
+    
+    if (currentTrackingMode === "continuous") {
+      await startLocationTracking();
+    }
 
     if (Platform.OS !== "web") {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -196,19 +215,51 @@ export function ShiftProvider({ children }: { children: React.ReactNode }) {
   const addEvent = async (
     eventData: Omit<ShiftEvent, "id" | "timestamp" | "latitude" | "longitude">
   ) => {
-    if (!activeShift || !currentLocation) return;
+    if (!activeShift) return;
+
+    let eventLocation = currentLocation;
+    
+    if (!eventLocation || trackingMode === "event-only") {
+      try {
+        const location = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.High,
+        });
+        
+        const point: LocationPoint = {
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+          timestamp: location.timestamp,
+          mode: currentMode,
+          accuracy: location.coords.accuracy || undefined,
+        };
+        
+        eventLocation = point;
+        setCurrentLocation(point);
+        
+        if (trackingMode === "event-only") {
+          const updatedRoute = [...activeShift.route, point];
+          setActiveShift(prev => prev ? { ...prev, route: updatedRoute } : prev);
+        }
+      } catch (error) {
+        console.error("Error getting location for event:", error);
+        return;
+      }
+    }
 
     const event: ShiftEvent = {
       ...eventData,
       id: generateId(),
       timestamp: Date.now(),
-      latitude: currentLocation.latitude,
-      longitude: currentLocation.longitude,
+      latitude: eventLocation.latitude,
+      longitude: eventLocation.longitude,
     };
 
     const updatedShift: Shift = {
       ...activeShift,
       events: [...activeShift.events, event],
+      route: trackingMode === "event-only" && eventLocation 
+        ? [...activeShift.route, eventLocation]
+        : activeShift.route,
     };
 
     setActiveShift(updatedShift);

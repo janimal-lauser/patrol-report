@@ -4,6 +4,23 @@ import { Shift, ShiftSummary } from "@/types/shift";
 const SHIFTS_KEY = "@patrol_tracker_shifts";
 const ACTIVE_SHIFT_KEY = "@patrol_tracker_active_shift";
 const USER_NAME_KEY = "@patrol_tracker_user_name";
+const SETTINGS_KEY = "@patrol_tracker_settings";
+
+export type TrackingMode = "continuous" | "event-only";
+
+export async function getTrackingMode(): Promise<TrackingMode> {
+  try {
+    const data = await AsyncStorage.getItem(SETTINGS_KEY);
+    if (data) {
+      const settings = JSON.parse(data);
+      return settings.trackingMode || "continuous";
+    }
+    return "continuous";
+  } catch (error) {
+    console.error("Error getting tracking mode:", error);
+    return "continuous";
+  }
+}
 
 export async function saveUserName(name: string): Promise<void> {
   try {
