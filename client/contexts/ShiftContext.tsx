@@ -40,6 +40,7 @@ export function ShiftProvider({ children }: { children: React.ReactNode }) {
   const [userName, setUserNameState] = useState<string | null>(null);
   const [trackingMode, setTrackingMode] = useState<TrackingMode>("continuous");
   const locationSubscription = useRef<Location.LocationSubscription | null>(null);
+  const currentModeRef = useRef<PatrolMode>(currentMode);
 
   useEffect(() => {
     loadActiveShift();
@@ -53,6 +54,11 @@ export function ShiftProvider({ children }: { children: React.ReactNode }) {
       }
     };
   }, []);
+
+  // Keep ref in sync with state so location tracking uses latest mode
+  useEffect(() => {
+    currentModeRef.current = currentMode;
+  }, [currentMode]);
 
   const loadTrackingMode = async () => {
     const mode = await getTrackingMode();
@@ -108,11 +114,12 @@ export function ShiftProvider({ children }: { children: React.ReactNode }) {
         distanceInterval: 10,
       },
       (location) => {
+        const mode = currentModeRef.current;
         const point: LocationPoint = {
           latitude: location.coords.latitude,
           longitude: location.coords.longitude,
           timestamp: location.timestamp,
-          mode: currentMode,
+          mode: mode,
           accuracy: location.coords.accuracy || undefined,
         };
         setCurrentLocation(point);
@@ -121,7 +128,7 @@ export function ShiftProvider({ children }: { children: React.ReactNode }) {
           if (prev && prev.isActive) {
             const updated = {
               ...prev,
-              route: [...prev.route, { ...point, mode: currentMode }],
+              route: [...prev.route, { ...point, mode: mode }],
             };
             saveActiveShift(updated);
             return updated;

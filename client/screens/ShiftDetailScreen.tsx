@@ -6,7 +6,6 @@ import {
   Image,
   Alert,
   Platform,
-  ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRoute, useNavigation, RouteProp } from "@react-navigation/native";
@@ -375,14 +374,7 @@ export default function ShiftDetailScreen() {
 
         <View style={styles.actionButtons}>
           <Button onPress={handleGeneratePDF} disabled={isGeneratingPDF}>
-            {isGeneratingPDF ? (
-              <View style={styles.loadingButton}>
-                <ActivityIndicator size="small" color="#fff" />
-                <ThemedText style={{ color: "#fff", marginLeft: 8 }}>Generating...</ThemedText>
-              </View>
-            ) : (
-              "Generate PDF Report"
-            )}
+            {isGeneratingPDF ? "Generating PDF..." : "Generate PDF Report"}
           </Button>
           <Button
             onPress={handleDelete}
@@ -466,10 +458,5 @@ const styles = StyleSheet.create({
   actionButtons: {
     gap: Spacing.md,
     marginTop: Spacing.lg,
-  },
-  loadingButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
   },
 });
