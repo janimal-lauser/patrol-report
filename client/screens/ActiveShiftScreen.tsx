@@ -153,6 +153,16 @@ export default function ActiveShiftScreen() {
   }, [userName]);
 
   const handleStartShift = async () => {
+    setShowNameModal(true);
+  };
+
+  const handleConfirmStart = async () => {
+    const name = nameInput.trim();
+    if (!name) {
+      Alert.alert("Name Required", "Please enter your name to start the shift.");
+      return;
+    }
+
     if (!locationPermission) {
       const granted = await requestLocationPermission();
       if (!granted) {
@@ -163,15 +173,7 @@ export default function ActiveShiftScreen() {
         return;
       }
     }
-    setShowNameModal(true);
-  };
 
-  const handleConfirmStart = async () => {
-    const name = nameInput.trim();
-    if (!name) {
-      Alert.alert("Name Required", "Please enter your name to start the shift.");
-      return;
-    }
     setShowNameModal(false);
     await startShift(name);
   };

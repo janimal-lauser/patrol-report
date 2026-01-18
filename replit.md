@@ -86,6 +86,10 @@ shared/
 - **Shift Summary**: Review completed shift before saving
 
 ## Recent Changes
+- Added user name entry modal - prompts for name when starting a shift
+- User names are persisted and attached to shift data for identification
+- Updated all subscription tiers to include both tracking modes (user choice)
+- Updated Stripe product descriptions to reflect all-inclusive tracking modes
 - Added GPS Tracking Mode toggle (Continuous vs Event-Only) in Profile
 - Integrated Stripe for subscription billing
 - Created subscription products (Personal, Business, Enterprise)
