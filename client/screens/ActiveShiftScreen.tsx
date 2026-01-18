@@ -39,7 +39,7 @@ export default function ActiveShiftScreen() {
   const insets = useSafeAreaInsets();
   const tabBarHeight = useBottomTabBarHeight();
   const navigation = useNavigation<NavigationProp>();
-  const mapRef = useRef<typeof MapView>(null);
+  const mapRef = useRef<any>(null);
 
   const {
     activeShift,

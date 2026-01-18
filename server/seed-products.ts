@@ -17,11 +17,11 @@ async function createProducts() {
   const personalProduct = await stripe.products.create({
     name: "Patrol Tracker Personal",
     description:
-      "For individual security professionals. Full GPS tracking with continuous route recording.",
+      "For individual security professionals. Includes both continuous and event-only GPS tracking modes.",
     metadata: {
       tier: "personal",
-      trackingMode: "continuous",
-      features: "GPS tracking, Photo evidence, Event logging, PDF reports",
+      trackingMode: "all",
+      features: "GPS tracking (continuous or event-only), Photo evidence, Event logging, PDF reports",
     },
   });
 
@@ -46,12 +46,12 @@ async function createProducts() {
   const businessProduct = await stripe.products.create({
     name: "Patrol Tracker Business",
     description:
-      "For small security businesses. All Personal features plus team management.",
+      "For small security businesses. All Personal features plus team management for up to 10 users.",
     metadata: {
       tier: "business",
-      trackingMode: "continuous",
+      trackingMode: "all",
       features:
-        "Everything in Personal, Team management (up to 10 users), Admin dashboard, Priority support",
+        "All tracking modes, Team management (up to 10 users), Admin dashboard, Shift sync, Priority support",
     },
   });
 
@@ -76,12 +76,12 @@ async function createProducts() {
   const enterpriseProduct = await stripe.products.create({
     name: "Patrol Tracker Enterprise",
     description:
-      "For security companies. Privacy-compliant event-only tracking for German labor law compliance.",
+      "For security companies. All tracking modes with unlimited users and enterprise features.",
     metadata: {
       tier: "enterprise",
-      trackingMode: "event-only",
+      trackingMode: "all",
       features:
-        "Event-only GPS (German labor law compliant), Unlimited users, Custom branding, API access, Dedicated support",
+        "All tracking modes (including German labor law compliant event-only), Unlimited users, Custom branding, API access, Dedicated support",
     },
   });
 
