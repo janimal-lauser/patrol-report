@@ -13,6 +13,7 @@ import { Feather } from "@expo/vector-icons";
 import { MapView, Polyline, Marker } from "@/components/MapViewCompat";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
+import * as FileSystem from "expo-file-system";
 
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
@@ -43,6 +44,7 @@ export default function ShiftDetailScreen() {
   const [shift, setShift] = useState<Shift | null>(null);
   const [summary, setSummary] = useState<ShiftSummary | null>(null);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
     loadShift();
@@ -202,11 +204,84 @@ export default function ShiftDetailScreen() {
           Alert.alert("Success", `PDF saved to: ${uri}`);
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error generating PDF:", error);
-      Alert.alert("Error", "Failed to generate PDF report. Please try again.");
+      Alert.alert(
+        "PDF Error", 
+        `Could not generate PDF: ${error?.message || "Unknown error"}. Try using "Export Data" instead.`
+      );
     } finally {
       setIsGeneratingPDF(false);
+    }
+  };
+
+  const handleExportData = async () => {
+    if (!shift || !summary) return;
+    
+    setIsExporting(true);
+    
+    try {
+      const exportData = {
+        exportedAt: new Date().toISOString(),
+        shift: {
+          id: shift.id,
+          userName: shift.userName,
+          startTime: new Date(shift.startTime).toISOString(),
+          endTime: shift.endTime ? new Date(shift.endTime).toISOString() : null,
+          trackingMode: shift.trackingMode,
+        },
+        summary: {
+          duration: summary.duration,
+          drivingDistance: summary.drivingDistance,
+          walkingDistance: summary.walkingDistance,
+          fieldCheckCount: summary.fieldCheckCount,
+          irregularityCount: summary.irregularityCount,
+        },
+        route: shift.route.map((point) => ({
+          lat: point.latitude,
+          lng: point.longitude,
+          time: new Date(point.timestamp).toISOString(),
+          mode: point.mode,
+          accuracy: point.accuracy,
+        })),
+        events: shift.events.map((event) => ({
+          type: event.type,
+          time: new Date(event.timestamp).toISOString(),
+          lat: event.latitude,
+          lng: event.longitude,
+          note: event.note || null,
+          hasPhoto: !!event.photoUri,
+        })),
+      };
+
+      const jsonString = JSON.stringify(exportData, null, 2);
+      const fileName = `patrol-report-${formatDate(summary.startTime).replace(/\//g, "-")}.json`;
+      const cacheDir = FileSystem.cacheDirectory;
+      if (!cacheDir) {
+        throw new Error("Cache directory not available");
+      }
+      const fileUri = cacheDir + fileName;
+      
+      await FileSystem.writeAsStringAsync(fileUri, jsonString);
+      
+      if (Platform.OS === "web") {
+        Alert.alert("Success", "Data exported successfully.");
+      } else {
+        const isAvailable = await Sharing.isAvailableAsync();
+        if (isAvailable) {
+          await Sharing.shareAsync(fileUri, {
+            mimeType: "application/json",
+            dialogTitle: `Export Patrol Data - ${formatDate(summary.startTime)}`,
+          });
+        } else {
+          Alert.alert("Success", `Data saved to: ${fileUri}`);
+        }
+      }
+    } catch (error: any) {
+      console.error("Error exporting data:", error);
+      Alert.alert("Error", `Failed to export data: ${error?.message || "Unknown error"}`);
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -375,6 +450,9 @@ export default function ShiftDetailScreen() {
         <View style={styles.actionButtons}>
           <Button onPress={handleGeneratePDF} disabled={isGeneratingPDF}>
             {isGeneratingPDF ? "Generating PDF..." : "Generate PDF Report"}
+          </Button>
+          <Button onPress={handleExportData} disabled={isExporting} style={{ backgroundColor: theme.success }}>
+            {isExporting ? "Exporting..." : "Export Data (Backup)"}
           </Button>
           <Button
             onPress={handleDelete}
