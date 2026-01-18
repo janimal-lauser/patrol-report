@@ -3,10 +3,10 @@ import { getUncachableStripeClient } from "./stripeClient";
 async function createProducts() {
   const stripe = await getUncachableStripeClient();
 
-  console.log("Creating Patrol Tracker subscription products...");
+  console.log("Creating Patrol Report subscription products...");
 
   const existingProducts = await stripe.products.search({
-    query: "name:'Patrol Tracker'",
+    query: "name:'Patrol Report'",
   });
 
   if (existingProducts.data.length > 0) {
@@ -15,7 +15,7 @@ async function createProducts() {
   }
 
   const personalProduct = await stripe.products.create({
-    name: "Patrol Tracker Personal",
+    name: "Patrol Report Personal",
     description:
       "For individual security professionals. Includes both continuous and event-only GPS tracking modes.",
     metadata: {
@@ -44,7 +44,7 @@ async function createProducts() {
   console.log(`Created: ${personalProduct.name} (${personalProduct.id})`);
 
   const businessProduct = await stripe.products.create({
-    name: "Patrol Tracker Business",
+    name: "Patrol Report Business",
     description:
       "For small security businesses. All Personal features plus team management for up to 10 users.",
     metadata: {
@@ -74,7 +74,7 @@ async function createProducts() {
   console.log(`Created: ${businessProduct.name} (${businessProduct.id})`);
 
   const enterpriseProduct = await stripe.products.create({
-    name: "Patrol Tracker Enterprise",
+    name: "Patrol Report Enterprise",
     description:
       "For security companies. All tracking modes with unlimited users and enterprise features.",
     metadata: {

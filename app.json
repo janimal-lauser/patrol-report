@@ -1,20 +1,20 @@
 {
   "expo": {
-    "name": "Patrol Tracker",
-    "slug": "patrol-tracker",
+    "name": "Patrol Report",
+    "slug": "patrol-report",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "patroltracker",
+    "scheme": "patrolreport",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.patrol.tracker",
+      "bundleIdentifier": "com.patrol.report",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Patrol Tracker needs access to your location to record your patrol route.",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "Patrol Tracker needs continuous location access to track your patrol route during shifts.",
-        "NSCameraUsageDescription": "Patrol Tracker needs camera access to take photos for field checks and incident reports."
+        "NSLocationWhenInUseUsageDescription": "Patrol Report needs access to your location to record your patrol route.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Patrol Report needs continuous location access to track your patrol route during shifts.",
+        "NSCameraUsageDescription": "Patrol Report needs camera access to take photos for field checks and incident reports."
       }
     },
     "android": {
@@ -24,7 +24,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.patrol.tracker",
+      "package": "com.patrol.report",
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
@@ -52,19 +52,19 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Patrol Tracker needs continuous location access to track your patrol route during shifts."
+          "locationAlwaysAndWhenInUsePermission": "Patrol Report needs continuous location access to track your patrol route during shifts."
         }
       ],
       [
         "expo-camera",
         {
-          "cameraPermission": "Patrol Tracker needs camera access to take photos for field checks and incident reports."
+          "cameraPermission": "Patrol Report needs camera access to take photos for field checks and incident reports."
         }
       ],
       [
         "expo-image-picker",
         {
-          "photosPermission": "Patrol Tracker needs access to your photos to attach images to reports."
+          "photosPermission": "Patrol Report needs access to your photos to attach images to reports."
         }
       ]
     ],

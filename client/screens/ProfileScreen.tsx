@@ -23,7 +23,7 @@ import { ProfileStackParamList } from "@/navigation/ProfileStackNavigator";
 
 type NavigationProp = NativeStackNavigationProp<ProfileStackParamList>;
 
-const SETTINGS_KEY = "@patrol_tracker_settings";
+const SETTINGS_KEY = "@patrol_report_settings";
 
 type TrackingMode = "continuous" | "event-only";
 
