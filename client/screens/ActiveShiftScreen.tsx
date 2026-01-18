@@ -73,7 +73,7 @@ export default function ActiveShiftScreen() {
   }, [isTracking, activeShift]);
 
   useEffect(() => {
-    if (currentLocation && mapRef.current) {
+    if (currentLocation && mapRef.current && mapRef.current.animateToRegion) {
       mapRef.current.animateToRegion(
         {
           latitude: currentLocation.latitude,
