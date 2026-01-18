@@ -445,30 +445,45 @@ export default function ActiveShiftScreen() {
       </View>
 
       {isTracking && activeShift ? (
-        <View style={[styles.legend, { top: insets.top + 170 }]}>
-          <View
-            style={[
-              styles.legendInner,
-              { backgroundColor: isDark ? "rgba(30,41,59,0.9)" : "rgba(255,255,255,0.9)" },
-            ]}
-          >
-            <ThemedText type="caption" style={{ marginBottom: 4 }}>
-              Time Segments
-            </ThemedText>
-            <View style={styles.legendRow}>
-              <View style={[styles.legendDot, { backgroundColor: RouteColors.segment1 }]} />
-              <ThemedText type="caption">0-30m</ThemedText>
-            </View>
-            <View style={styles.legendRow}>
-              <View style={[styles.legendDot, { backgroundColor: RouteColors.segment2 }]} />
-              <ThemedText type="caption">30-60m</ThemedText>
-            </View>
-            <View style={styles.legendRow}>
-              <View style={[styles.legendDot, { backgroundColor: RouteColors.segment3 }]} />
-              <ThemedText type="caption">60-90m</ThemedText>
+        <>
+          <View style={[styles.legend, { top: insets.top + 170 }]}>
+            <View
+              style={[
+                styles.legendInner,
+                { backgroundColor: isDark ? "rgba(30,41,59,0.9)" : "rgba(255,255,255,0.9)" },
+              ]}
+            >
+              <ThemedText type="caption" style={{ marginBottom: 4 }}>
+                Time Segments
+              </ThemedText>
+              <View style={styles.legendRow}>
+                <View style={[styles.legendDot, { backgroundColor: RouteColors.segment1 }]} />
+                <ThemedText type="caption">0-30m</ThemedText>
+              </View>
+              <View style={styles.legendRow}>
+                <View style={[styles.legendDot, { backgroundColor: RouteColors.segment2 }]} />
+                <ThemedText type="caption">30-60m</ThemedText>
+              </View>
+              <View style={styles.legendRow}>
+                <View style={[styles.legendDot, { backgroundColor: RouteColors.segment3 }]} />
+                <ThemedText type="caption">60-90m</ThemedText>
+              </View>
             </View>
           </View>
-        </View>
+          <View style={[styles.warningBanner, { top: insets.top + 290 }]}>
+            <View
+              style={[
+                styles.warningInner,
+                { backgroundColor: isDark ? "rgba(245,158,11,0.95)" : "rgba(251,191,36,0.95)" },
+              ]}
+            >
+              <Feather name="alert-circle" size={14} color="#78350f" />
+              <ThemedText style={[styles.warningText, { color: "#78350f" }]}>
+                Keep app open for tracking
+              </ThemedText>
+            </View>
+          </View>
+        </>
       ) : null}
 
       <Modal
@@ -714,5 +729,21 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: Spacing.md,
     borderRadius: BorderRadius.md,
+  },
+  warningBanner: {
+    position: "absolute",
+    left: Spacing.lg,
+  },
+  warningInner: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.sm,
+    gap: Spacing.xs,
+  },
+  warningText: {
+    fontSize: 11,
+    fontWeight: "500",
   },
 });
