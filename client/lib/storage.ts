@@ -3,6 +3,25 @@ import { Shift, ShiftSummary } from "@/types/shift";
 
 const SHIFTS_KEY = "@patrol_tracker_shifts";
 const ACTIVE_SHIFT_KEY = "@patrol_tracker_active_shift";
+const USER_NAME_KEY = "@patrol_tracker_user_name";
+
+export async function saveUserName(name: string): Promise<void> {
+  try {
+    await AsyncStorage.setItem(USER_NAME_KEY, name);
+  } catch (error) {
+    console.error("Error saving user name:", error);
+    throw error;
+  }
+}
+
+export async function getUserName(): Promise<string | null> {
+  try {
+    return await AsyncStorage.getItem(USER_NAME_KEY);
+  } catch (error) {
+    console.error("Error getting user name:", error);
+    return null;
+  }
+}
 
 export async function saveShift(shift: Shift): Promise<void> {
   try {
@@ -117,6 +136,7 @@ export function generateShiftSummary(shift: Shift): ShiftSummary {
 
   return {
     id: shift.id,
+    userName: shift.userName || "Unknown",
     date: new Date(shift.startTime).toLocaleDateString(),
     startTime: shift.startTime,
     endTime: shift.endTime || Date.now(),

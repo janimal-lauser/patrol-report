@@ -5,6 +5,8 @@ import {
   Pressable,
   Platform,
   Alert,
+  TextInput,
+  Modal,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
@@ -37,7 +39,7 @@ export default function ActiveShiftScreen() {
   const insets = useSafeAreaInsets();
   const tabBarHeight = useBottomTabBarHeight();
   const navigation = useNavigation<NavigationProp>();
-  const mapRef = useRef<MapView>(null);
+  const mapRef = useRef<typeof MapView>(null);
 
   const {
     activeShift,
@@ -45,6 +47,7 @@ export default function ActiveShiftScreen() {
     isTracking,
     currentLocation,
     locationPermission,
+    userName,
     startShift,
     endShift,
     setMode,
@@ -53,6 +56,8 @@ export default function ActiveShiftScreen() {
 
   const [elapsedTime, setElapsedTime] = useState(0);
   const [routeFilter, setRouteFilter] = useState<RouteFilter>("all");
+  const [showNameModal, setShowNameModal] = useState(false);
+  const [nameInput, setNameInput] = useState("");
   const startButtonScale = useSharedValue(1);
 
   useEffect(() => {
@@ -141,6 +146,12 @@ export default function ActiveShiftScreen() {
     return segments;
   }, [activeShift, routeFilter]);
 
+  useEffect(() => {
+    if (userName) {
+      setNameInput(userName);
+    }
+  }, [userName]);
+
   const handleStartShift = async () => {
     if (!locationPermission) {
       const granted = await requestLocationPermission();
@@ -152,7 +163,17 @@ export default function ActiveShiftScreen() {
         return;
       }
     }
-    await startShift();
+    setShowNameModal(true);
+  };
+
+  const handleConfirmStart = async () => {
+    const name = nameInput.trim();
+    if (!name) {
+      Alert.alert("Name Required", "Please enter your name to start the shift.");
+      return;
+    }
+    setShowNameModal(false);
+    await startShift(name);
   };
 
   const handleEndShift = async () => {
@@ -447,6 +468,54 @@ export default function ActiveShiftScreen() {
           </View>
         </View>
       ) : null}
+
+      <Modal
+        visible={showNameModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowNameModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: theme.surface }]}>
+            <ThemedText type="h3" style={{ marginBottom: Spacing.md }}>
+              Enter Your Name
+            </ThemedText>
+            <ThemedText type="body" style={{ color: theme.neutral, marginBottom: Spacing.lg }}>
+              Your name will be attached to this shift for identification.
+            </ThemedText>
+            <TextInput
+              style={[
+                styles.nameInput,
+                {
+                  backgroundColor: theme.backgroundDefault,
+                  color: theme.text,
+                  borderColor: theme.border,
+                },
+              ]}
+              placeholder="Enter your name"
+              placeholderTextColor={theme.neutral}
+              value={nameInput}
+              onChangeText={setNameInput}
+              autoFocus
+              autoCapitalize="words"
+            />
+            <View style={styles.modalButtons}>
+              <Pressable
+                style={[styles.modalButton, { backgroundColor: theme.neutral }]}
+                onPress={() => setShowNameModal(false)}
+              >
+                <ThemedText style={{ color: "#fff", fontWeight: "600" }}>Cancel</ThemedText>
+              </Pressable>
+              <Pressable
+                style={[styles.modalButton, { backgroundColor: theme.primary }]}
+                onPress={handleConfirmStart}
+              >
+                <ThemedText style={{ color: "#fff", fontWeight: "600" }}>Start Shift</ThemedText>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -612,5 +681,36 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 20,
     fontWeight: "700",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: Spacing.xl,
+  },
+  modalContent: {
+    width: "100%",
+    maxWidth: 400,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.xl,
+  },
+  nameInput: {
+    borderWidth: 1,
+    borderRadius: BorderRadius.md,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    fontSize: 16,
+    marginBottom: Spacing.lg,
+  },
+  modalButtons: {
+    flexDirection: "row",
+    gap: Spacing.md,
+  },
+  modalButton: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.md,
   },
 });

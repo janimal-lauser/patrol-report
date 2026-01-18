@@ -22,15 +22,19 @@ export interface ShiftEvent {
 
 export interface Shift {
   id: string;
+  userName: string;
   startTime: number;
   endTime?: number;
   route: LocationPoint[];
   events: ShiftEvent[];
   isActive: boolean;
+  trackingMode?: "continuous" | "event-only";
+  synced?: boolean;
 }
 
 export interface ShiftSummary {
   id: string;
+  userName: string;
   date: string;
   startTime: number;
   endTime: number;

@@ -8,6 +8,8 @@ import {
   getActiveShift,
   saveShift,
   generateId,
+  getUserName,
+  saveUserName,
 } from "@/lib/storage";
 
 interface ShiftContextType {
@@ -16,7 +18,9 @@ interface ShiftContextType {
   isTracking: boolean;
   currentLocation: LocationPoint | null;
   locationPermission: boolean;
-  startShift: () => Promise<void>;
+  userName: string | null;
+  setUserName: (name: string) => Promise<void>;
+  startShift: (userName: string) => Promise<void>;
   endShift: () => Promise<Shift | undefined>;
   setMode: (mode: PatrolMode) => void;
   addEvent: (event: Omit<ShiftEvent, "id" | "timestamp" | "latitude" | "longitude">) => Promise<void>;
@@ -31,11 +35,13 @@ export function ShiftProvider({ children }: { children: React.ReactNode }) {
   const [isTracking, setIsTracking] = useState(false);
   const [currentLocation, setCurrentLocation] = useState<LocationPoint | null>(null);
   const [locationPermission, setLocationPermission] = useState(false);
+  const [userName, setUserNameState] = useState<string | null>(null);
   const locationSubscription = useRef<Location.LocationSubscription | null>(null);
 
   useEffect(() => {
     loadActiveShift();
     checkLocationPermission();
+    loadUserName();
 
     return () => {
       if (locationSubscription.current) {
@@ -43,6 +49,16 @@ export function ShiftProvider({ children }: { children: React.ReactNode }) {
       }
     };
   }, []);
+
+  const loadUserName = async () => {
+    const name = await getUserName();
+    setUserNameState(name);
+  };
+
+  const handleSetUserName = async (name: string) => {
+    await saveUserName(name);
+    setUserNameState(name);
+  };
 
   const loadActiveShift = async () => {
     const shift = await getActiveShift();
@@ -104,9 +120,11 @@ export function ShiftProvider({ children }: { children: React.ReactNode }) {
     );
   };
 
-  const startShift = async () => {
+  const startShift = async (name: string) => {
     const hasPermission = await requestLocationPermission();
     if (!hasPermission) return;
+
+    await handleSetUserName(name);
 
     const location = await Location.getCurrentPositionAsync({
       accuracy: Location.Accuracy.High,
@@ -122,6 +140,7 @@ export function ShiftProvider({ children }: { children: React.ReactNode }) {
 
     const newShift: Shift = {
       id: generateId(),
+      userName: name,
       startTime: Date.now(),
       route: [initialPoint],
       events: [],
@@ -208,6 +227,8 @@ export function ShiftProvider({ children }: { children: React.ReactNode }) {
         isTracking,
         currentLocation,
         locationPermission,
+        userName,
+        setUserName: handleSetUserName,
         startShift,
         endShift,
         setMode,
