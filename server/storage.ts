@@ -233,6 +233,44 @@ export class Storage {
       .orderBy(routePoints.timestamp);
   }
 
+  // --- DELETE SHIFT (DSGVO Art. 17 -- Recht auf Loeschung) ---
+
+  async deleteShift(
+    shiftId: string,
+    companyId: string
+  ): Promise<boolean> {
+    return await db.transaction(async (tx) => {
+      // Pruefen ob Schicht existiert und zur Firma gehoert
+      const [shift] = await tx
+        .select()
+        .from(shifts)
+        .where(and(eq(shifts.id, shiftId), eq(shifts.companyId, companyId)));
+
+      if (!shift) return false;
+
+      // Cascade: Erst abhaengige Daten loeschen, dann Schicht
+      // 1. Route-Points (haben keinen companyId FK, nur shiftId)
+      await tx.delete(routePoints).where(eq(routePoints.shiftId, shiftId));
+
+      // 2. Shift-Events
+      await tx
+        .delete(shiftEvents)
+        .where(
+          and(
+            eq(shiftEvents.shiftId, shiftId),
+            eq(shiftEvents.companyId, companyId)
+          )
+        );
+
+      // 3. Schicht selbst
+      await tx
+        .delete(shifts)
+        .where(and(eq(shifts.id, shiftId), eq(shifts.companyId, companyId)));
+
+      return true;
+    });
+  }
+
   // --- CHECKPOINTS ---
 
   async createCheckpoint(data: InsertCheckpoint): Promise<Checkpoint> {

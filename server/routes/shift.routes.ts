@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { storage } from "../storage";
 import { asyncHandler } from "../lib/asyncHandler";
 import { ValidationError, NotFoundError } from "../lib/errors";
-import { requireAuth } from "../middleware/auth";
+import { requireAuth, requireRole } from "../middleware/auth";
 import "../types";
 
 export function registerShiftRoutes(app: Express) {
@@ -223,6 +223,38 @@ export function registerShiftRoutes(app: Express) {
       );
 
       res.json({ data: events });
+    })
+  );
+
+  // DELETE /api/shifts/:id -- Schicht loeschen (DSGVO Art. 17)
+  // Nur Admins duerfen Schichten loeschen. Cascade: Events + Route-Points werden mitgeloescht.
+  app.delete(
+    "/api/shifts/:id",
+    requireAuth,
+    requireRole("admin"),
+    asyncHandler(async (req, res) => {
+      const shift = await storage.getShift(
+        req.params.id,
+        req.user!.companyId
+      );
+
+      if (!shift) {
+        throw new NotFoundError("Schicht nicht gefunden");
+      }
+
+      const deleted = await storage.deleteShift(
+        req.params.id,
+        req.user!.companyId
+      );
+
+      if (!deleted) {
+        throw new NotFoundError("Schicht konnte nicht geloescht werden");
+      }
+
+      res.json({
+        message: "Schicht und zugehoerige Daten geloescht",
+        deletedShiftId: req.params.id,
+      });
     })
   );
 
