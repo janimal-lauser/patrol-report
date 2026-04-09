@@ -1,65 +1,14 @@
 import type { Express } from "express";
-import { createServer, type Server } from "node:http";
-import { storage } from "./storage";
-import { stripeService } from "./stripeService";
-import { getStripePublishableKey } from "./stripeClient";
+import { storage } from "../storage";
+import { stripeService } from "../stripeService";
+import { getStripePublishableKey } from "../stripeClient";
 
-export async function registerRoutes(app: Express): Promise<Server> {
+// Bestehende Stripe-Routen (aus der alten routes.ts uebernommen)
+export function registerStripeRoutes(app: Express) {
   app.get("/api/stripe/publishable-key", async (_req, res) => {
     try {
       const publishableKey = await getStripePublishableKey();
       res.json({ publishableKey });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  app.get("/api/products", async (_req, res) => {
-    try {
-      const products = await storage.listProducts();
-      res.json({ data: products });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  app.get("/api/products-with-prices", async (_req, res) => {
-    try {
-      const rows = await storage.listProductsWithPrices();
-
-      const productsMap = new Map();
-      for (const row of rows as any[]) {
-        if (!productsMap.has(row.product_id)) {
-          productsMap.set(row.product_id, {
-            id: row.product_id,
-            name: row.product_name,
-            description: row.product_description,
-            active: row.product_active,
-            metadata: row.product_metadata,
-            prices: []
-          });
-        }
-        if (row.price_id) {
-          productsMap.get(row.product_id).prices.push({
-            id: row.price_id,
-            unit_amount: row.unit_amount,
-            currency: row.currency,
-            recurring: row.recurring,
-            active: row.price_active,
-          });
-        }
-      }
-
-      res.json({ data: Array.from(productsMap.values()) });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  app.get("/api/prices", async (_req, res) => {
-    try {
-      const prices = await storage.listPrices();
-      res.json({ data: prices });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
@@ -73,16 +22,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Email and priceId are required" });
       }
 
-      let user = userId ? await storage.getUser(userId) : await storage.getUserByEmail(email);
+      let user = userId
+        ? await storage.getUser(userId)
+        : await storage.getUserByEmail(email);
 
       if (!user) {
-        user = await storage.createUser({ email });
+        // Fuer Checkout ohne Auth: temporaeren User erstellen
+        // Hinweis: In einer spaeteren Phase sollte Checkout nur fuer eingeloggte User moeglich sein
+        return res.status(400).json({ error: "User nicht gefunden. Bitte zuerst einloggen." });
       }
 
       let customerId = user.stripeCustomerId;
       if (!customerId) {
         const customer = await stripeService.createCustomer(email, user.id);
-        await storage.updateUserStripeInfo(user.id, { stripeCustomerId: customer.id });
+        await storage.updateUserStripeInfo(user.id, {
+          stripeCustomerId: customer.id,
+        });
         customerId = customer.id;
       }
 
@@ -127,8 +82,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json({ subscription: null });
       }
 
-      const subscription = await storage.getSubscription(user.stripeSubscriptionId);
-      res.json({ subscription });
+      // Abo-Status direkt von Stripe abfragen (da wir keine lokale stripe.* Tabelle mehr haben)
+      try {
+        const subscription = await stripeService.getSubscription(
+          user.stripeSubscriptionId
+        );
+        res.json({ subscription });
+      } catch {
+        res.json({ subscription: null });
+      }
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
@@ -141,13 +103,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Invalid tracking mode" });
       }
 
-      const user = await storage.updateUserTrackingMode(req.params.userId, trackingMode);
+      const user = await storage.updateUserTrackingMode(
+        req.params.userId,
+        trackingMode
+      );
       res.json({ user });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });
-
-  const httpServer = createServer(app);
-  return httpServer;
 }
