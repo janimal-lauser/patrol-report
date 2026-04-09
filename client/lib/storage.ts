@@ -1,47 +1,87 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
+/**
+ * Storage Layer fuer PatrolReport
+ *
+ * Nutzt SQLite (expo-sqlite) fuer alle sensiblen Daten auf nativen Geraeten.
+ * Auf Web: AsyncStorage als Fallback (nur fuer Development).
+ *
+ * Alle Funktions-Signaturen sind identisch zum alten AsyncStorage-basierten Code.
+ * Screens und Contexts die diese Funktionen importieren brauchen keine Aenderung.
+ */
+
+import { Platform } from "react-native";
 import { Shift, ShiftSummary } from "@/types/shift";
+import { getDatabase, ShiftRow } from "./database";
+
+// ── Types ──────────────────────────────────────────────────
+
+export type TrackingMode = "continuous" | "event-only";
+
+export interface Settings {
+  autoCenter: boolean;
+  highAccuracy: boolean;
+  trackingMode: TrackingMode;
+}
+
+const defaultSettings: Settings = {
+  autoCenter: true,
+  highAccuracy: true,
+  trackingMode: "continuous",
+};
+
+// ── Web Fallback (nur fuer Development) ────────────────────
+
+// AsyncStorage wird nur auf Web verwendet, wo expo-sqlite nicht verfuegbar ist.
+// Lazy import um bundle-size auf nativen Geraeten nicht zu belasten.
+async function getAsyncStorage() {
+  const mod = await import("@react-native-async-storage/async-storage");
+  return mod.default;
+}
 
 const SHIFTS_KEY = "@patrol_tracker_shifts";
 const ACTIVE_SHIFT_KEY = "@patrol_tracker_active_shift";
 const USER_NAME_KEY = "@patrol_tracker_user_name";
 const SETTINGS_KEY = "@patrol_tracker_settings";
 
-export type TrackingMode = "continuous" | "event-only";
+// ── Row <-> Shift Mapping ──────────────────────────────────
 
-export async function getTrackingMode(): Promise<TrackingMode> {
-  try {
-    const data = await AsyncStorage.getItem(SETTINGS_KEY);
-    if (data) {
-      const settings = JSON.parse(data);
-      return settings.trackingMode || "continuous";
-    }
-    return "continuous";
-  } catch (error) {
-    console.error("Error getting tracking mode:", error);
-    return "continuous";
-  }
+function rowToShift(row: ShiftRow): Shift {
+  return {
+    id: row.id,
+    userName: row.user_name,
+    startTime: row.start_time,
+    endTime: row.end_time ?? undefined,
+    route: JSON.parse(row.route),
+    events: JSON.parse(row.events),
+    isActive: row.is_active === 1,
+    trackingMode: (row.tracking_mode as TrackingMode) ?? "continuous",
+    synced: row.synced === 1,
+  };
 }
 
-export async function saveUserName(name: string): Promise<void> {
-  try {
-    await AsyncStorage.setItem(USER_NAME_KEY, name);
-  } catch (error) {
-    console.error("Error saving user name:", error);
-    throw error;
-  }
-}
+// ── Shift Storage ──────────────────────────────────────────
 
-export async function getUserName(): Promise<string | null> {
+export async function getShifts(): Promise<Shift[]> {
+  if (Platform.OS === "web") {
+    const AsyncStorage = await getAsyncStorage();
+    const data = await AsyncStorage.getItem(SHIFTS_KEY);
+    return data ? JSON.parse(data) : [];
+  }
+
   try {
-    return await AsyncStorage.getItem(USER_NAME_KEY);
+    const db = await getDatabase();
+    const rows = await db.getAllAsync<ShiftRow>(
+      "SELECT * FROM shifts WHERE is_active = 0 ORDER BY start_time DESC"
+    );
+    return rows.map(rowToShift);
   } catch (error) {
-    console.error("Error getting user name:", error);
-    return null;
+    console.error("Error getting shifts:", error);
+    return [];
   }
 }
 
 export async function saveShift(shift: Shift): Promise<void> {
-  try {
+  if (Platform.OS === "web") {
+    const AsyncStorage = await getAsyncStorage();
     const shifts = await getShifts();
     const existingIndex = shifts.findIndex((s) => s.id === shift.id);
     if (existingIndex >= 0) {
@@ -50,26 +90,46 @@ export async function saveShift(shift: Shift): Promise<void> {
       shifts.unshift(shift);
     }
     await AsyncStorage.setItem(SHIFTS_KEY, JSON.stringify(shifts));
+    return;
+  }
+
+  try {
+    const db = await getDatabase();
+    await db.runAsync(
+      `INSERT OR REPLACE INTO shifts
+       (id, user_name, start_time, end_time, route, events, is_active, tracking_mode, synced)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        shift.id,
+        shift.userName,
+        shift.startTime,
+        shift.endTime ?? null,
+        JSON.stringify(shift.route),
+        JSON.stringify(shift.events),
+        shift.isActive ? 1 : 0,
+        shift.trackingMode ?? "continuous",
+        shift.synced ? 1 : 0,
+      ]
+    );
   } catch (error) {
     console.error("Error saving shift:", error);
     throw error;
   }
 }
 
-export async function getShifts(): Promise<Shift[]> {
-  try {
-    const data = await AsyncStorage.getItem(SHIFTS_KEY);
-    return data ? JSON.parse(data) : [];
-  } catch (error) {
-    console.error("Error getting shifts:", error);
-    return [];
-  }
-}
-
 export async function getShiftById(id: string): Promise<Shift | null> {
-  try {
+  if (Platform.OS === "web") {
     const shifts = await getShifts();
     return shifts.find((s) => s.id === id) || null;
+  }
+
+  try {
+    const db = await getDatabase();
+    const row = await db.getFirstAsync<ShiftRow>(
+      "SELECT * FROM shifts WHERE id = ?",
+      [id]
+    );
+    return row ? rowToShift(row) : null;
   } catch (error) {
     console.error("Error getting shift:", error);
     return null;
@@ -77,23 +137,42 @@ export async function getShiftById(id: string): Promise<Shift | null> {
 }
 
 export async function deleteShift(id: string): Promise<void> {
-  try {
+  if (Platform.OS === "web") {
+    const AsyncStorage = await getAsyncStorage();
     const shifts = await getShifts();
     const filtered = shifts.filter((s) => s.id !== id);
     await AsyncStorage.setItem(SHIFTS_KEY, JSON.stringify(filtered));
+    return;
+  }
+
+  try {
+    const db = await getDatabase();
+    await db.runAsync("DELETE FROM shifts WHERE id = ?", [id]);
   } catch (error) {
     console.error("Error deleting shift:", error);
     throw error;
   }
 }
 
+// ── Active Shift ───────────────────────────────────────────
+
 export async function saveActiveShift(shift: Shift | null): Promise<void> {
-  try {
+  if (Platform.OS === "web") {
+    const AsyncStorage = await getAsyncStorage();
     if (shift) {
       await AsyncStorage.setItem(ACTIVE_SHIFT_KEY, JSON.stringify(shift));
     } else {
       await AsyncStorage.removeItem(ACTIVE_SHIFT_KEY);
     }
+    return;
+  }
+
+  try {
+    const db = await getDatabase();
+    await db.runAsync(
+      "INSERT OR REPLACE INTO active_shift (id, shift_data) VALUES (1, ?)",
+      [shift ? JSON.stringify(shift) : null]
+    );
   } catch (error) {
     console.error("Error saving active shift:", error);
     throw error;
@@ -101,14 +180,213 @@ export async function saveActiveShift(shift: Shift | null): Promise<void> {
 }
 
 export async function getActiveShift(): Promise<Shift | null> {
-  try {
+  if (Platform.OS === "web") {
+    const AsyncStorage = await getAsyncStorage();
     const data = await AsyncStorage.getItem(ACTIVE_SHIFT_KEY);
     return data ? JSON.parse(data) : null;
+  }
+
+  try {
+    const db = await getDatabase();
+    const row = await db.getFirstAsync<{ shift_data: string | null }>(
+      "SELECT shift_data FROM active_shift WHERE id = 1"
+    );
+    if (row?.shift_data) {
+      return JSON.parse(row.shift_data);
+    }
+    return null;
   } catch (error) {
     console.error("Error getting active shift:", error);
     return null;
   }
 }
+
+// ── Sync-Markierung ────────────────────────────────────────
+
+/**
+ * Markiert eine Shift als synchronisiert.
+ * Ersetzt den alten Ansatz: alle Shifts laden -> eine aendern -> alle speichern.
+ */
+export async function markShiftSynced(shiftId: string): Promise<void> {
+  if (Platform.OS === "web") {
+    const AsyncStorage = await getAsyncStorage();
+    const data = await AsyncStorage.getItem(SHIFTS_KEY);
+    if (data) {
+      const shifts: Shift[] = JSON.parse(data);
+      const updated = shifts.map((s) =>
+        s.id === shiftId ? { ...s, synced: true } : s
+      );
+      await AsyncStorage.setItem(SHIFTS_KEY, JSON.stringify(updated));
+    }
+    return;
+  }
+
+  try {
+    const db = await getDatabase();
+    await db.runAsync("UPDATE shifts SET synced = 1 WHERE id = ?", [shiftId]);
+  } catch (error) {
+    console.error("Error marking shift as synced:", error);
+  }
+}
+
+// ── User Name ──────────────────────────────────────────────
+
+export async function saveUserName(name: string): Promise<void> {
+  if (Platform.OS === "web") {
+    const AsyncStorage = await getAsyncStorage();
+    await AsyncStorage.setItem(USER_NAME_KEY, name);
+    return;
+  }
+
+  try {
+    const db = await getDatabase();
+    await db.runAsync(
+      "INSERT OR REPLACE INTO settings (key, value) VALUES ('user_name', ?)",
+      [name]
+    );
+  } catch (error) {
+    console.error("Error saving user name:", error);
+    throw error;
+  }
+}
+
+export async function getUserName(): Promise<string | null> {
+  if (Platform.OS === "web") {
+    const AsyncStorage = await getAsyncStorage();
+    return await AsyncStorage.getItem(USER_NAME_KEY);
+  }
+
+  try {
+    const db = await getDatabase();
+    const row = await db.getFirstAsync<{ value: string }>(
+      "SELECT value FROM settings WHERE key = 'user_name'"
+    );
+    return row?.value ?? null;
+  } catch (error) {
+    console.error("Error getting user name:", error);
+    return null;
+  }
+}
+
+// ── Settings ───────────────────────────────────────────────
+
+export async function getTrackingMode(): Promise<TrackingMode> {
+  if (Platform.OS === "web") {
+    const AsyncStorage = await getAsyncStorage();
+    const data = await AsyncStorage.getItem(SETTINGS_KEY);
+    if (data) {
+      const settings = JSON.parse(data);
+      return settings.trackingMode || "continuous";
+    }
+    return "continuous";
+  }
+
+  try {
+    const db = await getDatabase();
+    const row = await db.getFirstAsync<{ value: string }>(
+      "SELECT value FROM settings WHERE key = 'tracking_mode'"
+    );
+    return (row?.value as TrackingMode) ?? "continuous";
+  } catch (error) {
+    console.error("Error getting tracking mode:", error);
+    return "continuous";
+  }
+}
+
+/**
+ * Liest alle App-Settings aus der Datenbank.
+ * Ersetzt den direkten AsyncStorage-Zugriff in ProfileScreen.
+ */
+export async function getSettings(): Promise<Settings> {
+  if (Platform.OS === "web") {
+    const AsyncStorage = await getAsyncStorage();
+    const data = await AsyncStorage.getItem(SETTINGS_KEY);
+    return data ? { ...defaultSettings, ...JSON.parse(data) } : defaultSettings;
+  }
+
+  try {
+    const db = await getDatabase();
+    const rows = await db.getAllAsync<{ key: string; value: string }>(
+      "SELECT key, value FROM settings WHERE key IN ('auto_center', 'high_accuracy', 'tracking_mode')"
+    );
+
+    const result = { ...defaultSettings };
+    for (const row of rows) {
+      switch (row.key) {
+        case "auto_center":
+          result.autoCenter = row.value === "true";
+          break;
+        case "high_accuracy":
+          result.highAccuracy = row.value === "true";
+          break;
+        case "tracking_mode":
+          result.trackingMode = row.value as TrackingMode;
+          break;
+      }
+    }
+    return result;
+  } catch (error) {
+    console.error("Error getting settings:", error);
+    return defaultSettings;
+  }
+}
+
+/**
+ * Speichert alle App-Settings in die Datenbank.
+ * Ersetzt den direkten AsyncStorage-Zugriff in ProfileScreen.
+ */
+export async function saveSettings(settings: Settings): Promise<void> {
+  if (Platform.OS === "web") {
+    const AsyncStorage = await getAsyncStorage();
+    await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    return;
+  }
+
+  try {
+    const db = await getDatabase();
+    await db.runAsync(
+      "INSERT OR REPLACE INTO settings (key, value) VALUES ('auto_center', ?)",
+      [String(settings.autoCenter)]
+    );
+    await db.runAsync(
+      "INSERT OR REPLACE INTO settings (key, value) VALUES ('high_accuracy', ?)",
+      [String(settings.highAccuracy)]
+    );
+    await db.runAsync(
+      "INSERT OR REPLACE INTO settings (key, value) VALUES ('tracking_mode', ?)",
+      [settings.trackingMode]
+    );
+  } catch (error) {
+    console.error("Error saving settings:", error);
+    throw error;
+  }
+}
+
+// ── Clear All Data ─────────────────────────────────────────
+
+/**
+ * Loescht alle App-Daten aus der Datenbank.
+ * Ersetzt AsyncStorage.clear() in ProfileScreen.
+ */
+export async function clearAllData(): Promise<void> {
+  if (Platform.OS === "web") {
+    const AsyncStorage = await getAsyncStorage();
+    await AsyncStorage.clear();
+    return;
+  }
+
+  try {
+    const db = await getDatabase();
+    await db.execAsync(
+      "DELETE FROM shifts; DELETE FROM active_shift; DELETE FROM settings;"
+    );
+  } catch (error) {
+    console.error("Error clearing all data:", error);
+    throw error;
+  }
+}
+
+// ── Utility Functions (UNVERAENDERT) ───────────────────────
 
 export function calculateDistance(
   lat1: number,
