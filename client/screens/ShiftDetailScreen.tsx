@@ -11,7 +11,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRoute, useNavigation, RouteProp } from "@react-navigation/native";
 import { Feather } from "@expo/vector-icons";
 import { MapView, Polyline, Marker } from "@/components/MapViewCompat";
-import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 import * as FileSystem from "expo-file-system";
 
@@ -29,6 +28,7 @@ import {
   formatDistance,
   generateShiftSummary,
 } from "@/lib/storage";
+import { generateAndSharePDF } from "@/lib/pdfGenerator";
 import { Spacing, BorderRadius, RouteColors } from "@/constants/theme";
 import { Shift, ShiftSummary } from "@/types/shift";
 import { HistoryStackParamList } from "@/navigation/HistoryStackNavigator";
@@ -78,138 +78,9 @@ export default function ShiftDetailScreen() {
 
   const handleGeneratePDF = async () => {
     if (!shift || !summary) return;
-    
     setIsGeneratingPDF(true);
-    
     try {
-      const eventsHtml = shift.events.map((event) => `
-        <div class="event ${event.type}">
-          <div class="event-header">
-            <span class="event-type">${event.type === "fieldCheck" ? "Field Check" : "Irregularity"}</span>
-            <span class="event-time">${formatTime(event.timestamp)}</span>
-          </div>
-          ${event.note ? `<p class="event-note">${event.note}</p>` : ""}
-          <p class="event-location">Location: ${event.latitude.toFixed(5)}, ${event.longitude.toFixed(5)}</p>
-        </div>
-      `).join("");
-
-      const html = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <title>Patrol Report - ${formatDate(summary.startTime)}</title>
-          <style>
-            * { box-sizing: border-box; margin: 0; padding: 0; }
-            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px; color: #1e293b; }
-            .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #3b82f6; padding-bottom: 20px; }
-            .header h1 { font-size: 24px; color: #3b82f6; margin-bottom: 5px; }
-            .header p { color: #64748b; }
-            .section { margin-bottom: 25px; }
-            .section-title { font-size: 16px; font-weight: 600; color: #3b82f6; margin-bottom: 10px; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; }
-            .info-grid { display: flex; flex-wrap: wrap; gap: 15px; }
-            .info-item { flex: 1; min-width: 120px; background: #f8fafc; padding: 12px; border-radius: 8px; }
-            .info-item .label { font-size: 11px; color: #64748b; text-transform: uppercase; }
-            .info-item .value { font-size: 16px; font-weight: 600; margin-top: 4px; }
-            .stats-grid { display: flex; gap: 15px; flex-wrap: wrap; }
-            .stat { flex: 1; min-width: 100px; background: #f8fafc; padding: 15px; border-radius: 8px; text-align: center; }
-            .stat .value { font-size: 20px; font-weight: 700; color: #3b82f6; }
-            .stat .label { font-size: 11px; color: #64748b; margin-top: 4px; }
-            .event { background: #f8fafc; padding: 15px; border-radius: 8px; margin-bottom: 10px; border-left: 4px solid #10b981; }
-            .event.irregularity { border-left-color: #ef4444; }
-            .event-header { display: flex; justify-content: space-between; margin-bottom: 8px; }
-            .event-type { font-weight: 600; }
-            .event-time { color: #64748b; font-size: 13px; }
-            .event-note { margin: 8px 0; }
-            .event-location { font-size: 12px; color: #94a3b8; }
-            .footer { margin-top: 40px; text-align: center; color: #94a3b8; font-size: 11px; }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <h1>Patrol Report</h1>
-            <p>Shift Report for ${summary.userName}</p>
-          </div>
-          
-          <div class="section">
-            <div class="section-title">Shift Details</div>
-            <div class="info-grid">
-              <div class="info-item">
-                <div class="label">Date</div>
-                <div class="value">${formatDate(summary.startTime)}</div>
-              </div>
-              <div class="info-item">
-                <div class="label">Start Time</div>
-                <div class="value">${formatTime(summary.startTime)}</div>
-              </div>
-              <div class="info-item">
-                <div class="label">End Time</div>
-                <div class="value">${formatTime(summary.endTime)}</div>
-              </div>
-              <div class="info-item">
-                <div class="label">Duration</div>
-                <div class="value">${formatDuration(summary.duration)}</div>
-              </div>
-            </div>
-          </div>
-          
-          <div class="section">
-            <div class="section-title">Statistics</div>
-            <div class="stats-grid">
-              <div class="stat">
-                <div class="value">${formatDistance(summary.drivingDistance)}</div>
-                <div class="label">Driving Distance</div>
-              </div>
-              <div class="stat">
-                <div class="value">${formatDistance(summary.walkingDistance)}</div>
-                <div class="label">Walking Distance</div>
-              </div>
-              <div class="stat">
-                <div class="value">${summary.fieldCheckCount}</div>
-                <div class="label">Field Checks</div>
-              </div>
-              <div class="stat">
-                <div class="value">${summary.irregularityCount}</div>
-                <div class="label">Irregularities</div>
-              </div>
-            </div>
-          </div>
-          
-          ${shift.events.length > 0 ? `
-          <div class="section">
-            <div class="section-title">Event Log (${shift.events.length})</div>
-            ${eventsHtml}
-          </div>
-          ` : ""}
-          
-          <div class="footer">
-            Generated by Patrol Report on ${new Date().toLocaleString()}
-          </div>
-        </body>
-        </html>
-      `;
-
-      const { uri } = await Print.printToFileAsync({ html });
-      
-      if (Platform.OS === "web") {
-        Alert.alert("Success", "PDF generated successfully.");
-      } else {
-        const isAvailable = await Sharing.isAvailableAsync();
-        if (isAvailable) {
-          await Sharing.shareAsync(uri, {
-            mimeType: "application/pdf",
-            dialogTitle: `Patrol Report - ${formatDate(summary.startTime)}`,
-          });
-        } else {
-          Alert.alert("Success", `PDF saved to: ${uri}`);
-        }
-      }
-    } catch (error: any) {
-      console.error("Error generating PDF:", error);
-      Alert.alert(
-        "PDF Error", 
-        `Could not generate PDF: ${error?.message || "Unknown error"}. Try using "Export Data" instead.`
-      );
+      await generateAndSharePDF({ shift, summary });
     } finally {
       setIsGeneratingPDF(false);
     }
@@ -449,16 +320,16 @@ export default function ShiftDetailScreen() {
 
         <View style={styles.actionButtons}>
           <Button onPress={handleGeneratePDF} disabled={isGeneratingPDF}>
-            {isGeneratingPDF ? "Generating PDF..." : "Generate PDF Report"}
+            {isGeneratingPDF ? "PDF wird erstellt..." : "PDF-Report erstellen"}
           </Button>
           <Button onPress={handleExportData} disabled={isExporting} style={{ backgroundColor: theme.success }}>
-            {isExporting ? "Exporting..." : "Export Data (Backup)"}
+            {isExporting ? "Exportiere..." : "Daten exportieren (Backup)"}
           </Button>
           <Button
             onPress={handleDelete}
             style={{ backgroundColor: theme.error }}
           >
-            Delete Shift
+            Schicht löschen
           </Button>
         </View>
       </ScrollView>

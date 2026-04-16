@@ -26,6 +26,7 @@ import {
   formatDistance,
   generateShiftSummary,
 } from "@/lib/storage";
+import { generateAndSharePDF } from "@/lib/pdfGenerator";
 import { Spacing, BorderRadius, RouteColors } from "@/constants/theme";
 import { Shift, ShiftSummary } from "@/types/shift";
 import { RootStackParamList } from "@/navigation/RootStackNavigator";
@@ -53,11 +54,16 @@ export default function ShiftSummaryModal() {
     }
   };
 
-  const handleGeneratePDF = () => {
-    Alert.alert(
-      "Coming Soon",
-      "PDF report generation will be available in the next update."
-    );
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+
+  const handleGeneratePDF = async () => {
+    if (!lastShift || !summary) return;
+    setIsGeneratingPDF(true);
+    try {
+      await generateAndSharePDF({ shift: lastShift, summary });
+    } finally {
+      setIsGeneratingPDF(false);
+    }
   };
 
   const handleUploadPortal = () => {
@@ -254,7 +260,9 @@ export default function ShiftSummaryModal() {
         ) : null}
 
         <View style={styles.actionButtons}>
-          <Button onPress={handleGeneratePDF}>Generate PDF Report</Button>
+          <Button onPress={handleGeneratePDF} disabled={isGeneratingPDF}>
+            {isGeneratingPDF ? "PDF wird erstellt..." : "PDF-Report erstellen"}
+          </Button>
           <Pressable
             style={[styles.secondaryButton, { borderColor: theme.primary }]}
             onPress={handleUploadPortal}
