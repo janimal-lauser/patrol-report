@@ -7,12 +7,16 @@ import {
   saveActiveShift,
   getActiveShift,
   saveShift,
+  getShifts,
   generateId,
   getUserName,
   saveUserName,
   getTrackingMode,
   TrackingMode,
+  generateShiftSummary,
+  markShiftSynced,
 } from "@/lib/storage";
+import { shiftApi } from "@/lib/api";
 
 interface ShiftContextType {
   activeShift: Shift | null;
@@ -209,8 +213,72 @@ export function ShiftProvider({ children }: { children: React.ReactNode }) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     }
 
+    // Schicht an den Server senden (im Hintergrund, blockiert nicht)
+    syncShiftToServer(completedShift);
+
     return completedShift;
   };
+
+  // Schicht zum Server synchronisieren
+  const syncShiftToServer = async (shift: Shift) => {
+    try {
+      const summary = generateShiftSummary(shift);
+      await shiftApi.syncShift({
+        clientId: shift.id,
+        startTime: shift.startTime,
+        endTime: shift.endTime,
+        trackingMode: shift.trackingMode || "continuous",
+        status: "completed",
+        summaryData: {
+          drivingDistance: summary.drivingDistance,
+          walkingDistance: summary.walkingDistance,
+          fieldCheckCount: summary.fieldCheckCount,
+          irregularityCount: summary.irregularityCount,
+        },
+        events: shift.events.map((e) => ({
+          id: e.id,
+          type: e.type,
+          timestamp: e.timestamp,
+          latitude: e.latitude,
+          longitude: e.longitude,
+          note: e.note,
+          photoUri: e.photoUri,
+        })),
+        routePoints: shift.route.map((p) => ({
+          latitude: p.latitude,
+          longitude: p.longitude,
+          timestamp: p.timestamp,
+          mode: p.mode,
+          accuracy: p.accuracy,
+        })),
+      });
+
+      // Schicht als synchronisiert markieren (direkt in SQLite, kein Array-Laden noetig)
+      await markShiftSynced(shift.id);
+
+      console.log("Schicht synchronisiert:", shift.id);
+    } catch (error) {
+      console.log("Sync fehlgeschlagen (wird spaeter erneut versucht):", error);
+    }
+  };
+
+  // Beim App-Start unsynchronisierte Schichten nachsenden
+  const syncPendingShifts = useCallback(async () => {
+    try {
+      const allShifts = await getShifts();
+      const pending = allShifts.filter((s) => !s.synced && !s.isActive);
+      for (const shift of pending) {
+        await syncShiftToServer(shift);
+      }
+    } catch (error) {
+      console.log("Pending-Sync fehlgeschlagen:", error);
+    }
+  }, []);
+
+  // Unsynchronisierte Schichten beim Start nachholen
+  useEffect(() => {
+    syncPendingShifts();
+  }, [syncPendingShifts]);
 
   const setMode = useCallback((mode: PatrolMode) => {
     setCurrentMode(mode);

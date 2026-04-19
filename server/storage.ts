@@ -1,80 +1,57 @@
-import { users } from "@shared/schema";
-import { eq, sql } from "drizzle-orm";
+import {
+  users,
+  companies,
+  shifts,
+  shiftEvents,
+  checkpoints,
+  routePoints,
+} from "@shared/schema";
+import type {
+  User,
+  InsertUser,
+  Company,
+  InsertCompany,
+  Shift,
+  InsertShift,
+  ShiftEvent,
+  InsertShiftEvent,
+  Checkpoint,
+  InsertCheckpoint,
+  RoutePoint,
+  InsertRoutePoint,
+} from "@shared/schema";
+import { eq, and, desc, sql, gte, lte } from "drizzle-orm";
 import { db } from "./db";
-import type { User, InsertUser } from "@shared/schema";
 
 export class Storage {
-  async getProduct(productId: string) {
-    const result = await db.execute(
-      sql`SELECT * FROM stripe.products WHERE id = ${productId}`
-    );
-    return result.rows[0] || null;
+  // --- COMPANIES ---
+
+  async getCompany(companyId: string): Promise<Company | undefined> {
+    const [company] = await db
+      .select()
+      .from(companies)
+      .where(eq(companies.id, companyId));
+    return company;
   }
 
-  async listProducts(active = true, limit = 20, offset = 0) {
-    const result = await db.execute(
-      sql`SELECT * FROM stripe.products WHERE active = ${active} LIMIT ${limit} OFFSET ${offset}`
-    );
-    return result.rows;
+  async createCompany(data: InsertCompany): Promise<Company> {
+    const [company] = await db.insert(companies).values(data).returning();
+    return company;
   }
 
-  async listProductsWithPrices(active = true, limit = 20, offset = 0) {
-    const result = await db.execute(
-      sql`
-        WITH paginated_products AS (
-          SELECT id, name, description, metadata, active
-          FROM stripe.products
-          WHERE active = ${active}
-          ORDER BY id
-          LIMIT ${limit} OFFSET ${offset}
-        )
-        SELECT 
-          p.id as product_id,
-          p.name as product_name,
-          p.description as product_description,
-          p.active as product_active,
-          p.metadata as product_metadata,
-          pr.id as price_id,
-          pr.unit_amount,
-          pr.currency,
-          pr.recurring,
-          pr.active as price_active,
-          pr.metadata as price_metadata
-        FROM paginated_products p
-        LEFT JOIN stripe.prices pr ON pr.product = p.id AND pr.active = true
-        ORDER BY p.id, pr.unit_amount
-      `
-    );
-    return result.rows;
+  async updateCompany(
+    companyId: string,
+    data: Partial<InsertCompany>
+  ): Promise<Company | undefined> {
+    const [company] = await db
+      .update(companies)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(companies.id, companyId))
+      .returning();
+    return company;
   }
 
-  async getPrice(priceId: string) {
-    const result = await db.execute(
-      sql`SELECT * FROM stripe.prices WHERE id = ${priceId}`
-    );
-    return result.rows[0] || null;
-  }
-
-  async listPrices(active = true, limit = 20, offset = 0) {
-    const result = await db.execute(
-      sql`SELECT * FROM stripe.prices WHERE active = ${active} LIMIT ${limit} OFFSET ${offset}`
-    );
-    return result.rows;
-  }
-
-  async getPricesForProduct(productId: string) {
-    const result = await db.execute(
-      sql`SELECT * FROM stripe.prices WHERE product = ${productId} AND active = true`
-    );
-    return result.rows;
-  }
-
-  async getSubscription(subscriptionId: string) {
-    const result = await db.execute(
-      sql`SELECT * FROM stripe.subscriptions WHERE id = ${subscriptionId}`
-    );
-    return result.rows[0] || null;
-  }
+  // --- USERS ---
 
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
@@ -82,7 +59,10 @@ export class Storage {
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.email, email));
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, email));
     return user;
   }
 
@@ -91,11 +71,35 @@ export class Storage {
     return user;
   }
 
-  async updateUserStripeInfo(userId: string, stripeInfo: {
-    stripeCustomerId?: string;
-    stripeSubscriptionId?: string;
-    subscriptionTier?: string;
-  }): Promise<User | undefined> {
+  async listUsersByCompany(companyId: string): Promise<User[]> {
+    return db
+      .select()
+      .from(users)
+      .where(eq(users.companyId, companyId))
+      .orderBy(users.name);
+  }
+
+  async updateUser(
+    userId: string,
+    companyId: string,
+    data: Partial<InsertUser>
+  ): Promise<User | undefined> {
+    const [user] = await db
+      .update(users)
+      .set({ ...data, updatedAt: new Date() })
+      .where(and(eq(users.id, userId), eq(users.companyId, companyId)))
+      .returning();
+    return user;
+  }
+
+  async updateUserStripeInfo(
+    userId: string,
+    stripeInfo: {
+      stripeCustomerId?: string;
+      stripeSubscriptionId?: string;
+      subscriptionTier?: string;
+    }
+  ): Promise<User | undefined> {
     const [user] = await db
       .update(users)
       .set({ ...stripeInfo, updatedAt: new Date() })
@@ -104,13 +108,209 @@ export class Storage {
     return user;
   }
 
-  async updateUserTrackingMode(userId: string, trackingMode: string): Promise<User | undefined> {
+  async updateUserTrackingMode(
+    userId: string,
+    trackingMode: string
+  ): Promise<User | undefined> {
     const [user] = await db
       .update(users)
       .set({ trackingMode, updatedAt: new Date() })
       .where(eq(users.id, userId))
       .returning();
     return user;
+  }
+
+  // --- SHIFTS ---
+
+  async createShift(data: InsertShift): Promise<Shift> {
+    const [shift] = await db.insert(shifts).values(data).returning();
+    return shift;
+  }
+
+  async getShift(
+    shiftId: string,
+    companyId: string
+  ): Promise<Shift | undefined> {
+    const [shift] = await db
+      .select()
+      .from(shifts)
+      .where(and(eq(shifts.id, shiftId), eq(shifts.companyId, companyId)));
+    return shift;
+  }
+
+  async getShiftByClientId(
+    clientId: string,
+    companyId: string
+  ): Promise<Shift | undefined> {
+    const [shift] = await db
+      .select()
+      .from(shifts)
+      .where(
+        and(eq(shifts.clientId, clientId), eq(shifts.companyId, companyId))
+      );
+    return shift;
+  }
+
+  async listShifts(
+    companyId: string,
+    options: {
+      userId?: string;
+      limit?: number;
+      offset?: number;
+      startDate?: Date;
+      endDate?: Date;
+    } = {}
+  ): Promise<Shift[]> {
+    const { userId, limit = 50, offset = 0, startDate, endDate } = options;
+
+    const conditions = [eq(shifts.companyId, companyId)];
+    if (userId) conditions.push(eq(shifts.userId, userId));
+    if (startDate) conditions.push(gte(shifts.startTime, startDate));
+    if (endDate) conditions.push(lte(shifts.startTime, endDate));
+
+    return db
+      .select()
+      .from(shifts)
+      .where(and(...conditions))
+      .orderBy(desc(shifts.startTime))
+      .limit(limit)
+      .offset(offset);
+  }
+
+  async updateShift(
+    shiftId: string,
+    companyId: string,
+    data: Partial<InsertShift>
+  ): Promise<Shift | undefined> {
+    const [shift] = await db
+      .update(shifts)
+      .set({ ...data, updatedAt: new Date() })
+      .where(and(eq(shifts.id, shiftId), eq(shifts.companyId, companyId)))
+      .returning();
+    return shift;
+  }
+
+  // --- SHIFT EVENTS ---
+
+  async createShiftEvents(events: InsertShiftEvent[]): Promise<ShiftEvent[]> {
+    if (events.length === 0) return [];
+    return db.insert(shiftEvents).values(events).returning();
+  }
+
+  async getShiftEvents(
+    shiftId: string,
+    companyId: string
+  ): Promise<ShiftEvent[]> {
+    return db
+      .select()
+      .from(shiftEvents)
+      .where(
+        and(
+          eq(shiftEvents.shiftId, shiftId),
+          eq(shiftEvents.companyId, companyId)
+        )
+      )
+      .orderBy(shiftEvents.timestamp);
+  }
+
+  // --- ROUTE POINTS ---
+
+  async createRoutePoints(points: InsertRoutePoint[]): Promise<void> {
+    if (points.length === 0) return;
+    // Bulk-Insert in Batches von 500 (PostgreSQL Parameter-Limit)
+    const batchSize = 500;
+    for (let i = 0; i < points.length; i += batchSize) {
+      const batch = points.slice(i, i + batchSize);
+      await db.insert(routePoints).values(batch);
+    }
+  }
+
+  async getRoutePoints(shiftId: string): Promise<RoutePoint[]> {
+    return db
+      .select()
+      .from(routePoints)
+      .where(eq(routePoints.shiftId, shiftId))
+      .orderBy(routePoints.timestamp);
+  }
+
+  // --- DELETE SHIFT (DSGVO Art. 17 -- Recht auf Loeschung) ---
+
+  async deleteShift(
+    shiftId: string,
+    companyId: string
+  ): Promise<boolean> {
+    return await db.transaction(async (tx) => {
+      // Pruefen ob Schicht existiert und zur Firma gehoert
+      const [shift] = await tx
+        .select()
+        .from(shifts)
+        .where(and(eq(shifts.id, shiftId), eq(shifts.companyId, companyId)));
+
+      if (!shift) return false;
+
+      // Cascade: Erst abhaengige Daten loeschen, dann Schicht
+      // 1. Route-Points (haben keinen companyId FK, nur shiftId)
+      await tx.delete(routePoints).where(eq(routePoints.shiftId, shiftId));
+
+      // 2. Shift-Events
+      await tx
+        .delete(shiftEvents)
+        .where(
+          and(
+            eq(shiftEvents.shiftId, shiftId),
+            eq(shiftEvents.companyId, companyId)
+          )
+        );
+
+      // 3. Schicht selbst
+      await tx
+        .delete(shifts)
+        .where(and(eq(shifts.id, shiftId), eq(shifts.companyId, companyId)));
+
+      return true;
+    });
+  }
+
+  // --- CHECKPOINTS ---
+
+  async createCheckpoint(data: InsertCheckpoint): Promise<Checkpoint> {
+    const [checkpoint] = await db
+      .insert(checkpoints)
+      .values(data)
+      .returning();
+    return checkpoint;
+  }
+
+  async listCheckpoints(
+    companyId: string,
+    activeOnly = true
+  ): Promise<Checkpoint[]> {
+    const conditions = [eq(checkpoints.companyId, companyId)];
+    if (activeOnly) conditions.push(eq(checkpoints.isActive, true));
+
+    return db
+      .select()
+      .from(checkpoints)
+      .where(and(...conditions))
+      .orderBy(checkpoints.sortOrder);
+  }
+
+  async updateCheckpoint(
+    checkpointId: string,
+    companyId: string,
+    data: Partial<InsertCheckpoint>
+  ): Promise<Checkpoint | undefined> {
+    const [checkpoint] = await db
+      .update(checkpoints)
+      .set({ ...data, updatedAt: new Date() })
+      .where(
+        and(
+          eq(checkpoints.id, checkpointId),
+          eq(checkpoints.companyId, companyId)
+        )
+      )
+      .returning();
+    return checkpoint;
   }
 }
 

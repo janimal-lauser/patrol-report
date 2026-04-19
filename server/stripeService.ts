@@ -1,5 +1,5 @@
-import { storage } from './storage';
-import { getUncachableStripeClient } from './stripeClient';
+import { storage } from "./storage";
+import { getUncachableStripeClient } from "./stripeClient";
 
 export class StripeService {
   async createCustomer(email: string, userId: string) {
@@ -10,13 +10,18 @@ export class StripeService {
     });
   }
 
-  async createCheckoutSession(customerId: string, priceId: string, successUrl: string, cancelUrl: string) {
+  async createCheckoutSession(
+    customerId: string,
+    priceId: string,
+    successUrl: string,
+    cancelUrl: string
+  ) {
     const stripe = await getUncachableStripeClient();
     return await stripe.checkout.sessions.create({
       customer: customerId,
-      payment_method_types: ['card'],
+      payment_method_types: ["card"],
       line_items: [{ price: priceId, quantity: 1 }],
-      mode: 'subscription',
+      mode: "subscription",
       success_url: successUrl,
       cancel_url: cancelUrl,
     });
@@ -30,12 +35,9 @@ export class StripeService {
     });
   }
 
-  async getProduct(productId: string) {
-    return await storage.getProduct(productId);
-  }
-
   async getSubscription(subscriptionId: string) {
-    return await storage.getSubscription(subscriptionId);
+    const stripe = await getUncachableStripeClient();
+    return await stripe.subscriptions.retrieve(subscriptionId);
   }
 }
 

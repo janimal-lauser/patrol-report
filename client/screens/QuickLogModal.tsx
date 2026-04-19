@@ -14,6 +14,7 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 
+import { savePhotoToSandbox } from "@/lib/photoStorage";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { Button } from "@/components/Button";
@@ -104,10 +105,16 @@ export default function QuickLogModal() {
 
     setSaving(true);
     try {
+      // Foto aus temporaerem Cache in permanente Sandbox kopieren (DSGVO-konform)
+      let permanentPhotoUri: string | undefined;
+      if (photoUri) {
+        permanentPhotoUri = await savePhotoToSandbox(photoUri);
+      }
+
       await addEvent({
         type: logType,
         note: note.trim() || undefined,
-        photoUri: photoUri || undefined,
+        photoUri: permanentPhotoUri,
       });
       navigation.goBack();
     } catch (error) {

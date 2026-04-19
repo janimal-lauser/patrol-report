@@ -11,27 +11,18 @@ import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { Card } from "@/components/Card";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { useTheme } from "@/hooks/useTheme";
+import { useAuth } from "@/contexts/AuthContext";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { ProfileStackParamList } from "@/navigation/ProfileStackNavigator";
+import { getSettings, saveSettings, clearAllData, type Settings, type TrackingMode } from "@/lib/storage";
+import { deleteAllPhotos } from "@/lib/photoStorage";
 
 type NavigationProp = NativeStackNavigationProp<ProfileStackParamList>;
-
-const SETTINGS_KEY = "@patrol_report_settings";
-
-type TrackingMode = "continuous" | "event-only";
-
-interface Settings {
-  autoCenter: boolean;
-  highAccuracy: boolean;
-  trackingMode: TrackingMode;
-}
 
 const defaultSettings: Settings = {
   autoCenter: true,
@@ -41,6 +32,7 @@ const defaultSettings: Settings = {
 
 export default function ProfileScreen() {
   const { theme } = useTheme();
+  const { user, logout } = useAuth();
   const insets = useSafeAreaInsets();
   const tabBarHeight = useBottomTabBarHeight();
   const navigation = useNavigation<NavigationProp>();
@@ -53,15 +45,8 @@ export default function ProfileScreen() {
 
   const loadSettings = async () => {
     try {
-      const data = await AsyncStorage.getItem(SETTINGS_KEY);
-      if (data) {
-        const savedSettings = JSON.parse(data);
-        const mergedSettings = { ...defaultSettings, ...savedSettings };
-        setSettings(mergedSettings);
-        if (!savedSettings.trackingMode) {
-          await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(mergedSettings));
-        }
-      }
+      const saved = await getSettings();
+      setSettings(saved);
     } catch (error) {
       console.error("Error loading settings:", error);
     }
@@ -70,7 +55,7 @@ export default function ProfileScreen() {
   const updateSetting = async <K extends keyof Settings>(key: K, value: Settings[K]) => {
     const newSettings = { ...settings, [key]: value };
     setSettings(newSettings);
-    await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(newSettings));
+    await saveSettings(newSettings);
   };
 
   const handleClearData = () => {
@@ -84,7 +69,8 @@ export default function ProfileScreen() {
           style: "destructive",
           onPress: async () => {
             try {
-              await AsyncStorage.clear();
+              await clearAllData();
+              await deleteAllPhotos();
               setSettings(defaultSettings);
               Alert.alert("Success", "All data has been cleared.");
             } catch (error) {
@@ -121,11 +107,16 @@ export default function ProfileScreen() {
             <Feather name="shield" size={48} color="#fff" />
           </View>
           <ThemedText type="h3" style={{ marginTop: Spacing.md }}>
-            Patrol Officer
+            {user?.name || "Patrol Officer"}
           </ThemedText>
           <ThemedText type="body" style={{ color: theme.neutral }}>
-            Night Security
+            {user?.email || ""}
           </ThemedText>
+          {user?.role === "admin" && (
+            <ThemedText type="caption" style={{ color: theme.primary, marginTop: Spacing.xs }}>
+              Administrator
+            </ThemedText>
+          )}
         </View>
 
         <View style={styles.section}>
@@ -254,6 +245,36 @@ export default function ProfileScreen() {
                 Off
               </ThemedText>
               <Feather name="chevron-right" size={20} color={theme.neutral} />
+            </Pressable>
+          </Card>
+        </View>
+
+        <View style={styles.section}>
+          <ThemedText type="caption" style={styles.sectionTitle}>
+            ACCOUNT
+          </ThemedText>
+          <Card elevation={1} style={styles.settingsCard}>
+            <Pressable
+              style={styles.menuItem}
+              onPress={() => {
+                Alert.alert(
+                  "Abmelden",
+                  "Moechtest du dich wirklich abmelden?",
+                  [
+                    { text: "Abbrechen", style: "cancel" },
+                    {
+                      text: "Abmelden",
+                      style: "destructive",
+                      onPress: logout,
+                    },
+                  ]
+                );
+              }}
+            >
+              <Feather name="log-out" size={20} color={theme.error} />
+              <ThemedText type="body" style={{ color: theme.error }}>
+                Abmelden
+              </ThemedText>
             </Pressable>
           </Card>
         </View>
